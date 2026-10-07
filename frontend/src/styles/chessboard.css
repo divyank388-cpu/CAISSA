@@ -1,0 +1,61 @@
+:root {
+  --light-square: #ebe9ec;
+  --dark-square: #7e737b;
+  --label-color: #b9b2bb;
+}
+
+.board-frame {
+  display: grid;
+  grid-template-columns: 28px var(--board-size);
+  grid-template-rows: var(--board-size) 28px;
+  grid-template-areas:
+    "ranks board"
+    ".     files";
+}
+
+.rank-labels { grid-area: ranks; display: flex; flex-direction: column; }
+.file-labels { grid-area: files; display: flex; }
+
+.rank-labels span,
+.file-labels span {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--label-color);
+  font-size: 0.85rem;
+  letter-spacing: 0.05em;
+  user-select: none;
+}
+
+.board {
+  grid-area: board;
+  display: grid;
+  grid-template: repeat(8, 1fr) / repeat(8, 1fr);
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5), 0 18px 50px rgba(0, 0, 0, 0.55);
+}
+
+.square { display: flex; align-items: center; justify-content: center; }
+.square.light { background: var(--light-square); }
+.square.dark { background: var(--dark-square); }
+
+.piece {
+  font-family: "Segoe UI Symbol", "Noto Sans Symbols 2", "Apple Symbols", "DejaVu Sans", serif;
+  font-size: calc(var(--board-size) / 8 * 0.8);
+  line-height: 1;
+  user-select: none;
+}
+
+.piece.white {
+  color: #fdfcfd;
+  -webkit-text-stroke: 1.4px #2b252a;
+  paint-order: stroke fill;
+  text-shadow: 0 2px 3px rgba(0, 0, 0, 0.35);
+}
+
+.piece.black {
+  color: #1b171a;
+  text-shadow: 0 1px 1px rgba(255, 255, 255, 0.25);
+}
