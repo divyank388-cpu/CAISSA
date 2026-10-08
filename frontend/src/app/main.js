@@ -1,5 +1,7 @@
-import { createChessboard } from "../components/chessboard/Chessboard.js";
+import { mountPlayGame } from "../features/play/PlayGame.js";
 
-const START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-
-document.getElementById("board-mount").append(createChessboard(START_FEN));
+mountPlayGame(document.getElementById("board-mount")).catch((error) => {
+  console.error(error);
+  document.getElementById("board-mount").textContent =
+    "Could not start the game. Check your internet connection (chess.js loads from a CDN) and the browser console.";
+});

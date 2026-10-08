@@ -34,3 +34,91 @@ body {
   border-radius: 14px;
   box-shadow: 0 18px 50px rgba(0, 0, 0, 0.4);
 }
+
+/* ---- Play screen: status, notice, actions ---- */
+.board-area {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: calc(var(--board-size) + 28px);
+}
+
+.game-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-left: 28px;
+  color: #ece8ee;
+  font-size: 1.05rem;
+  letter-spacing: 0.02em;
+}
+
+.turn-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1px solid #5a5460;
+}
+.turn-dot.white { background: #f6f4f7; }
+.turn-dot.black { background: #141114; }
+.turn-dot.over { opacity: 0.4; }
+
+.game-notice {
+  min-height: 1.2em;
+  padding-left: 28px;
+  color: #e8b86b;
+  font-size: 0.85rem;
+}
+
+.game-actions {
+  display: flex;
+  gap: 10px;
+  padding-left: 28px;
+}
+
+.game-actions button {
+  flex: 1;
+  padding: 10px 14px;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  background: var(--panel-bg);
+  color: #ece8ee;
+  font: inherit;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.game-actions button:hover:enabled { background: #322e39; }
+.game-actions button:disabled { opacity: 0.4; cursor: default; }
+
+/* ---- Promotion picker ---- */
+.promotion-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 8, 12, 0.6);
+  z-index: 10;
+}
+.promotion-dialog {
+  display: flex;
+  gap: 10px;
+  padding: 16px;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 14px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.6);
+}
+.promotion-dialog button {
+  width: 76px;
+  height: 76px;
+  border: none;
+  border-radius: 10px;
+  background: var(--light-square);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.promotion-dialog button:hover { background: #fff; }
+.promotion-dialog .piece { font-size: 54px; }

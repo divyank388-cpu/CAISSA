@@ -59,3 +59,32 @@
   color: #1b171a;
   text-shadow: 0 1px 1px rgba(255, 255, 255, 0.25);
 }
+
+/* ---- Interaction states ---- */
+.square { position: relative; cursor: pointer; }
+
+.square.last-move {
+  background-image: linear-gradient(rgba(190, 210, 90, 0.45), rgba(190, 210, 90, 0.45));
+}
+.square.selected {
+  background-image: linear-gradient(rgba(255, 214, 90, 0.6), rgba(255, 214, 90, 0.6));
+}
+.square.check {
+  background-image: radial-gradient(circle, rgba(222, 52, 52, 0.9) 0%, rgba(222, 52, 52, 0) 72%);
+}
+
+.square.target::after {
+  content: "";
+  position: absolute;
+  width: 30%;
+  height: 30%;
+  border-radius: 50%;
+  background: rgba(35, 30, 40, 0.35);
+  pointer-events: none;
+}
+.square.target.capture::after {
+  width: 86%;
+  height: 86%;
+  background: transparent;
+  border: 5px solid rgba(35, 30, 40, 0.35);
+}

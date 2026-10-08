@@ -13,3 +13,15 @@ export function parseFenPlacement(fen) {
     return cells;
   });
 }
+
+// Square name (e.g. "e1") of the given color's king, or null. color: "white" | "black".
+export function findKingSquare(fen, color) {
+  const grid = parseFenPlacement(fen);
+  for (let row = 0; row < 8; row += 1) {
+    for (let col = 0; col < 8; col += 1) {
+      const cell = grid[row][col];
+      if (cell && cell.type === "k" && cell.color === color) return `${"abcdefgh"[col]}${8 - row}`;
+    }
+  }
+  return null;
+}
