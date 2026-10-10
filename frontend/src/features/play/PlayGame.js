@@ -7,7 +7,9 @@ import { h } from "../../utils/dom.js";
 import { addMatch, removeMatch } from "../../services/matchHistory.js";
 import { createGameControls } from "./GameControls.js";
 
-const OFFLINE_NOTICE = "Server not reachable: playing with chess.js only (python-chess is not checking moves).";
+// Only developers running locally need to hear the server is missing. On a static deployment chess.js alone runs the game.
+const IS_LOCAL = ["localhost", "127.0.0.1"].includes(location.hostname);
+const OFFLINE_NOTICE = IS_LOCAL ? "Server not reachable: playing with chess.js only (python-chess is not checking moves)." : "";
 
 // Compare only placement, side to move and castling: clocks and en-passant formatting can differ.
 const fenCore = (fen) => fen.split(" ").slice(0, 3).join(" ");
