@@ -1,39 +1,113 @@
 import { parseFenPlacement } from "../../utils/fen.js";
+import { h } from "../../utils/dom.js";
 
 // Filled glyphs for both colors; CSS decides white vs black. \uFE0E forces text (not emoji) style.
 export const GLYPHS = { k: "♚", q: "♛", r: "♜", b: "♝", n: "♞", p: "♟" };
 const FILES = "abcdefgh";
+const DRAG_THRESHOLD_PX = 6;
 
 function labels(items) {
-  return items.map((text) => {
-    const span = document.createElement("span");
-    span.textContent = text;
-    return span;
-  });
+  return items.map((text) => h("span", {}, String(text)));
 }
 
-// A "dumb" board: draws whatever it is told to and reports clicks. It knows no chess rules.
-export function createChessboard({ onSquareClick }) {
-  const frame = document.createElement("div");
-  frame.className = "board-frame";
-  const ranks = document.createElement("div");
-  ranks.className = "rank-labels";
-  const files = document.createElement("div");
-  files.className = "file-labels";
-  const board = document.createElement("div");
-  board.className = "board";
-  frame.append(ranks, board, files);
+const squareAt = (x, y) => document.elementFromPoint(x, y)?.closest?.(".square") ?? null;
+
+/**
+ * A "dumb" board: draws whatever it is told to and reports what the player does. It knows no chess rules.
+ *  - onSquareClick(square)
+ *  - onDragStart(square) -> true if that piece may be dragged (the controller decides)
+ *  - onDrop(from, to)    -> `to` is null when dropped outside the board / cancelled
+ */
+export function createChessboard({ onSquareClick, onDragStart = () => false, onDrop = () => {} }) {
+  const ranks = h("div", { class: "rank-labels" });
+  const files = h("div", { class: "file-labels" });
+  const board = h("div", { class: "board" });
+  const frame = h("div", { class: "board-frame" }, ranks, board, files);
+
+  let pending = null; // pointer is down on a draggable piece
+  let ghost = null; // floating copy of the piece, exists only while really dragging
+  let hovered = null;
+  let dragFrom = null;
+  let suppressClick = false;
 
   board.addEventListener("click", (event) => {
+    if (suppressClick) return;
     const square = event.target.closest(".square");
     if (square) onSquareClick(square.dataset.square);
   });
 
+  board.addEventListener("pointerdown", (event) => {
+    if (pending || (event.pointerType === "mouse" && event.button !== 0)) return;
+    const squareEl = event.target.closest(".square");
+    const pieceEl = squareEl?.querySelector(".piece");
+    if (!pieceEl) return;
+    const info = { square: squareEl.dataset.square, glyph: pieceEl.textContent, className: pieceEl.className };
+    if (!onDragStart(info.square)) return;
+    pending = { ...info, pointerId: event.pointerId, x: event.clientX, y: event.clientY };
+    board.setPointerCapture(event.pointerId);
+  });
+
+  board.addEventListener("pointermove", (event) => {
+    if (!pending || event.pointerId !== pending.pointerId) return;
+    if (!ghost) {
+      if (Math.hypot(event.clientX - pending.x, event.clientY - pending.y) < DRAG_THRESHOLD_PX) return;
+      dragFrom = pending.square;
+      ghost = h("span", { class: `${pending.className} drag-ghost` }, pending.glyph);
+      document.body.append(ghost);
+      board.querySelector(`[data-square="${dragFrom}"] .piece`)?.classList.add("drag-source");
+    }
+    ghost.style.left = `${event.clientX}px`;
+    ghost.style.top = `${event.clientY}px`;
+    const over = squareAt(event.clientX, event.clientY);
+    if (over !== hovered) {
+      hovered?.classList.remove("drag-over");
+      over?.classList.add("drag-over");
+      hovered = over;
+    }
+  });
+
+  function endDrag(event, cancelled) {
+    if (!pending || event.pointerId !== pending.pointerId) return;
+    const from = pending.square;
+    const dragging = Boolean(ghost);
+    const to = dragging && !cancelled ? squareAt(event.clientX, event.clientY)?.dataset.square ?? null : null;
+
+    ghost?.remove();
+    ghost = null;
+    hovered?.classList.remove("drag-over");
+    hovered = null;
+    dragFrom = null;
+    board.querySelector(".drag-source")?.classList.remove("drag-source");
+    try {
+      board.releasePointerCapture(pending.pointerId);
+    } catch {}
+    pending = null;
+
+    if (dragging) {
+      suppressClick = true; // the browser may still send a click after a drag
+      setTimeout(() => (suppressClick = false), 0);
+      onDrop(from, to);
+    }
+  }
+  board.addEventListener("pointerup", (event) => endDrag(event, false));
+  board.addEventListener("pointercancel", (event) => endDrag(event, true));
+
+  // Red flash + shake for an illegal move attempt.
+  function flash(square) {
+    board.querySelector(`[data-square="${square}"]`)?.classList.add("illegal");
+    board.classList.add("shake");
+    setTimeout(() => {
+      board.querySelector(".illegal")?.classList.remove("illegal");
+      board.classList.remove("shake");
+    }, 600);
+  }
+
   function render({ fen, orientation = "white", selected = null, targets = [], lastMove = null, checkSquare = null }) {
     const grid = parseFenPlacement(fen); // row 0 = rank 8, col 0 = file a
     const flipped = orientation === "black";
-    const rowOrder = flipped ? [7, 6, 5, 4, 3, 2, 1, 0] : [0, 1, 2, 3, 4, 5, 6, 7];
-    const colOrder = flipped ? [7, 6, 5, 4, 3, 2, 1, 0] : [0, 1, 2, 3, 4, 5, 6, 7];
+    const order = [0, 1, 2, 3, 4, 5, 6, 7];
+    const rowOrder = flipped ? [...order].reverse() : order;
+    const colOrder = flipped ? [...order].reverse() : order;
     const targetMap = new Map(targets.map((move) => [move.to, move]));
 
     const squares = [];
@@ -49,15 +123,10 @@ export function createChessboard({ onSquareClick }) {
         if (target) classes.push("target");
         if (target && target.captured) classes.push("capture");
 
-        const square = document.createElement("div");
-        square.className = classes.join(" ");
-        square.dataset.square = name;
+        const square = h("div", { class: classes.join(" "), "data-square": name });
         const cell = grid[row][col];
         if (cell) {
-          const piece = document.createElement("span");
-          piece.className = `piece ${cell.color}`;
-          piece.textContent = `${GLYPHS[cell.type]}\uFE0E`;
-          square.append(piece);
+          square.append(h("span", { class: `piece ${cell.color}${name === dragFrom ? " drag-source" : ""}` }, `${GLYPHS[cell.type]}\uFE0E`));
         }
         squares.push(square);
       }
@@ -67,5 +136,5 @@ export function createChessboard({ onSquareClick }) {
     files.replaceChildren(...labels(colOrder.map((col) => FILES[col].toUpperCase())));
   }
 
-  return { element: frame, render };
+  return { element: frame, render, flash };
 }

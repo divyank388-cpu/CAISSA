@@ -4,7 +4,7 @@ import { createChessboard } from "../../components/chessboard/Chessboard.js";
 import { askPromotion } from "../../components/common/PromotionDialog.js";
 import { findKingSquare } from "../../utils/fen.js";
 import { h } from "../../utils/dom.js";
-import { addMatch } from "../../services/matchHistory.js";
+import { addMatch, removeMatch } from "../../services/matchHistory.js";
 import { createGameControls } from "./GameControls.js";
 
 const OFFLINE_NOTICE = "Server not reachable: playing with chess.js only (python-chess is not checking moves).";
@@ -84,9 +84,12 @@ export function mountPlayGame(root, options = {}) {
   let timerId = null;
   let timedOut = null;
   let recorded = false;
+  let recordedId = null;
+  let overlayDismissed = false;
+  let noticeTimer = null;
 
   const controls = createGameControls({ onNewGame: newGame, onUndo: undo, onFlip: flip });
-  const board = createChessboard({ onSquareClick: squareClicked });
+  const board = createChessboard({ onSquareClick: squareClicked, onDragStart: dragStarted, onDrop: dropped });
   const topBar = showPlayers ? createPlayerBar(Boolean(clock)) : null;
   const bottomBar = showPlayers ? createPlayerBar(Boolean(clock)) : null;
   const boardParts = [...(topBar ? [topBar.element] : []), board.element, ...(bottomBar ? [bottomBar.element] : [])];
@@ -97,12 +100,58 @@ export function mountPlayGame(root, options = {}) {
     root.append(controls.statusElement, ...boardParts, controls.noticeElement, controls.actionsElement);
   }
 
+  const overlayTitle = h("h2", {});
+  const overlayDetail = h("p", {});
+  const overlay = h(
+    "div",
+    { class: "game-over", role: "dialog", "aria-live": "polite" },
+    h(
+      "div",
+      { class: "game-over-card" },
+      overlayTitle,
+      overlayDetail,
+      h(
+        "div",
+        { class: "game-over-actions" },
+        h("button", { class: "btn inline", type: "button", onclick: () => newGame() }, "New game"),
+        h("button", { class: "btn secondary inline", type: "button", onclick: () => { overlayDismissed = true; render(); } }, "Review board"),
+      ),
+    ),
+  );
+  board.element.append(overlay);
+
   const isOver = () => game.isGameOver() || Boolean(timedOut);
+
+  const winText = (colour) => {
+    const label = colour === "white" ? "White" : "Black";
+    return players[colour] === label ? `${label} wins` : `${players[colour]} wins (${label})`;
+  };
+
+  // Uses chess.js to name the result: checkmate, stalemate, other draws, or time out.
+  function outcomeText() {
+    if (timedOut) return { title: "Time out", detail: winText(timedOut === "white" ? "black" : "white") };
+    if (game.isCheckmate()) return { title: "Checkmate", detail: winText(game.turn() === "w" ? "black" : "white") };
+    if (game.isStalemate()) return { title: "Stalemate", detail: "No legal moves and the king is not in check, so the game is a draw." };
+    return { title: "Draw", detail: `Draw by ${drawReason(game)}.` };
+  }
+
+  function updateOverlay() {
+    if (!isOver() || overlayDismissed) {
+      overlay.classList.remove("show");
+      return;
+    }
+    const { title, detail } = outcomeText();
+    overlayTitle.textContent = title;
+    overlayDetail.textContent = detail;
+    overlay.classList.add("show");
+  }
 
   // ---- clock ----
   function resetClocks() {
     timedOut = null;
     recorded = false;
+    recordedId = null;
+    overlayDismissed = false;
     clocks = clock ? { w: clock.minutes * 60000, b: clock.minutes * 60000 } : null;
     lastTick = Date.now();
   }
@@ -159,8 +208,9 @@ export function mountPlayGame(root, options = {}) {
       checkSquare: game.inCheck() ? findKingSquare(game.fen(), colourName(game.turn())) : null,
     });
     controls.setStatus(describeStatus(game, timedOut));
-    controls.setUndoEnabled(history.length > 0 && !busy && !isOver());
+    controls.setUndoEnabled(history.length > 0 && !busy && !timedOut);
     renderBars();
+    updateOverlay();
     maybeRecord();
   }
 
@@ -176,8 +226,9 @@ export function mountPlayGame(root, options = {}) {
       result = game.turn() === "w" ? "0-1" : "1-0";
       reason = "Checkmate";
     }
+    recordedId = Date.now().toString(36);
     addMatch({
-      id: Date.now().toString(36),
+      id: recordedId,
       date: new Date().toISOString(),
       label,
       white: players.white,
@@ -228,25 +279,78 @@ export function mountPlayGame(root, options = {}) {
   }
 
   // ---- interaction ----
+  const baseNotice = () => (online ? "" : OFFLINE_NOTICE);
+
+  function showTransientNotice(message) {
+    controls.setNotice(message);
+    clearTimeout(noticeTimer);
+    noticeTimer = setTimeout(() => {
+      if (!destroyed) controls.setNotice(baseNotice());
+    }, 4500);
+  }
+
+  // The player tried a move chess.js does not allow: snap back, flash, explain.
+  function rejectMove(to) {
+    render();
+    board.flash(to);
+    showTransientNotice(
+      game.inCheck()
+        ? "Illegal move: your king is in check. Deal with the check first."
+        : `Illegal move: that piece can't go to ${to}, or it would leave your king in check.`,
+    );
+  }
+
+  // Only the side to move may pick up a piece.
+  function dragStarted(square) {
+    if (busy || destroyed || isOver()) return false;
+    const piece = game.get(square);
+    if (!piece || piece.color !== game.turn()) return false;
+    if (selected !== square) {
+      selected = square;
+      render();
+    }
+    return true;
+  }
+
+  async function dropped(from, to) {
+    if (busy || destroyed) return;
+    if (!to || to === from) {
+      render(); // dropped outside the board or back where it came from
+      return;
+    }
+    await tryMove(from, to);
+  }
+
   async function squareClicked(square) {
     if (busy || destroyed || isOver()) return;
-    if (selected) {
-      const candidates = game.moves({ square: selected, verbose: true }).filter((move) => move.to === square);
-      if (candidates.length) {
-        await attemptMove(selected, square, candidates);
-        return;
-      }
-    }
     const piece = game.get(square);
-    selected = piece && piece.color === game.turn() ? square : null;
+    const ownPiece = piece && piece.color === game.turn();
+    if (selected && square !== selected && !ownPiece) {
+      await tryMove(selected, square);
+      return;
+    }
+    selected = ownPiece && square !== selected ? square : null;
     render();
+  }
+
+  // chess.js decides whether the move is legal; python-chess confirms it in attemptMove.
+  async function tryMove(from, to) {
+    const candidates = game.moves({ square: from, verbose: true }).filter((move) => move.to === to);
+    if (!candidates.length) {
+      rejectMove(to);
+      return;
+    }
+    await attemptMove(from, to, candidates);
   }
 
   async function attemptMove(from, to, candidates) {
     let promotion;
     if (candidates.some((move) => move.promotion)) {
       promotion = await askPromotion(game.turn());
-      if (!promotion) return;
+      if (!promotion) {
+        render();
+        return;
+      }
     }
     busy = true;
     try {
@@ -260,9 +364,11 @@ export function mountPlayGame(root, options = {}) {
         clocks[mover] += clock.increment * 1000;
         lastTick = Date.now();
       }
+      clearTimeout(noticeTimer);
+      controls.setNotice(baseNotice());
       verify(state);
     } catch (error) {
-      controls.setNotice(error.message);
+      showTransientNotice(error.message);
     } finally {
       selected = null;
       busy = false;
@@ -271,13 +377,19 @@ export function mountPlayGame(root, options = {}) {
   }
 
   async function undo() {
-    if (busy || game.history().length === 0 || isOver()) return;
+    if (busy || game.history().length === 0 || timedOut) return;
     busy = true;
     try {
       await backend((id) => api.undoMove(id));
       game.undo();
+      if (recorded) {
+        removeMatch(recordedId); // undoing a checkmate/stalemate: the game is not over any more
+        recorded = false;
+        recordedId = null;
+      }
+      overlayDismissed = false;
     } catch (error) {
-      controls.setNotice(error.message);
+      showTransientNotice(error.message);
     } finally {
       selected = null;
       busy = false;
@@ -315,5 +427,6 @@ export function mountPlayGame(root, options = {}) {
   return () => {
     destroyed = true;
     stopTimer();
+    clearTimeout(noticeTimer);
   };
 }

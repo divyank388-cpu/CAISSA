@@ -15,3 +15,9 @@ export function addMatch(match) {
     localStorage.setItem(KEY, JSON.stringify(all));
   } catch {}
 }
+
+export function removeMatch(id) {
+  try {
+    localStorage.setItem(KEY, JSON.stringify(getMatches().filter((match) => match.id !== id)));
+  } catch {}
+}
