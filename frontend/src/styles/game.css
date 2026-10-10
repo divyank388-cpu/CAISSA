@@ -1,0 +1,82 @@
+.game-row { display: flex; flex-wrap: wrap; gap: 28px; align-items: flex-start; }
+
+.board-area { display: flex; flex-direction: column; gap: 12px; width: calc(var(--board-size) + 28px); }
+
+/* Right-hand explainer space. Intentionally empty for now. */
+.teacher-panel {
+  flex: 1 1 300px;
+  max-width: 520px;
+  min-height: calc(var(--board-size) + 120px);
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 18px;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.22);
+}
+
+.game-status { display: flex; align-items: center; gap: 10px; padding-left: 28px; font-size: 1.02rem; letter-spacing: 0.02em; }
+.turn-dot { width: 14px; height: 14px; border-radius: 50%; border: 1px solid #5a5460; }
+.turn-dot.white { background: #f6f4f7; }
+.turn-dot.black { background: #141114; }
+.turn-dot.over { opacity: 0.4; }
+
+.player-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: 28px;
+  padding: 9px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  transition: border-color 0.2s;
+}
+.player-bar.active { border-color: var(--accent); }
+.pb-dot { width: 14px; height: 14px; border-radius: 50%; border: 1px solid #5a5460; }
+.pb-dot.white { background: #f6f4f7; }
+.pb-dot.black { background: #141114; }
+.pb-name { flex: 1; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pb-clock { min-width: 74px; padding: 4px 10px; border-radius: 8px; background: var(--bg-2); text-align: right; font-family: ui-monospace, Consolas, monospace; font-size: 1.25rem; font-variant-numeric: tabular-nums; color: var(--muted); }
+.player-bar.active .pb-clock { color: var(--text); background: var(--accent-soft); }
+.pb-clock.low { color: var(--bad) !important; }
+
+.game-notice { min-height: 1.2em; padding-left: 28px; color: #e8b86b; font-size: 0.85rem; }
+
+.game-actions { display: flex; gap: 10px; padding-left: 28px; }
+.game-actions button {
+  flex: 1;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.game-actions button:hover:enabled { background: var(--surface-2); }
+.game-actions button:disabled { opacity: 0.4; cursor: default; }
+
+.load-error { padding: 24px; color: var(--bad); line-height: 1.5; }
+
+/* ---- Promotion picker ---- */
+.promotion-overlay { position: fixed; inset: 0; z-index: 80; display: flex; align-items: center; justify-content: center; background: rgba(10, 8, 12, 0.6); }
+.promotion-dialog { display: flex; gap: 10px; padding: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; box-shadow: 0 18px 50px rgba(0, 0, 0, 0.6); }
+.promotion-dialog button { width: 76px; height: 76px; border: none; border-radius: 10px; background: var(--light-square); cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.promotion-dialog button:hover { background: #fff; }
+.promotion-dialog .piece { font-size: 54px; }
+
+/* Friend matches: status + buttons in a side card next to the board */
+.game-side {
+  flex: 0 1 290px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 22px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.22);
+}
+.game-side .game-status { padding-left: 0; font-size: 1.15rem; font-family: var(--serif); }
+.game-side .game-notice { padding-left: 0; }
+.game-side .game-actions { padding-left: 0; flex-direction: column; }
